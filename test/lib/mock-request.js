@@ -1,6 +1,7 @@
 'use strict'
 
-const process = require('process')
+const process = require('process'),
+      debug = require('debug')('test/mock-request');
 
 /**
  * Mock out the "req" objects that get passed around
@@ -16,7 +17,7 @@ module.exports.get = function(url) {
         url,
         connection: {},
         socket: {},
-        on(event) {console.log('on(' + event + ')')},
+        on(event) {debug('on(' + event + ')')},
         pipe(what) {
             process.nextTick(() => {
                 // Mock GET requests (and GET requests in general)
