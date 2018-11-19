@@ -76,6 +76,6 @@ describe.only('Cache unit tests', function() {
                   'PLZDONTCACHEME');
         let restToo = await cache.writeBack(req, res)
         assert(res === restToo)
-        assert.equal(FakeRedis.keys(), [])
+        assert.deepEqual(FakeRedis.keys(), [])
     })
 })
