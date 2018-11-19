@@ -4,7 +4,8 @@ const chai = require('chai'),
       Document = require('../lib/document.js'),
       assert = require('assert'),
       buildAProxy = require('../lib/proxy-request-adapter.js'),
-      MockProxy = require('./lib/mock-proxy.js');
+      MockProxy = require('./lib/mock-proxy.js'),
+      streamToPromise = require('stream-to-promise');
 
 // require("long-stack-traces");
 
@@ -45,6 +46,11 @@ describe('Origin server: integration with http-proxy', function() {
         proxy = buildAProxy({host: 'localhost', port: mockServer.port});
     });
 
+    after(function() {
+        // Comment out the next line if you want to make send a few
+        // queries of your own to the mockServer:
+        mockServer.stop();
+    });
 
     it('forwards a GET with success', async function() {
         let config = {
@@ -57,6 +63,8 @@ describe('Origin server: integration with http-proxy', function() {
         let response = await(server.forward(req));
         assert(response instanceof Document);
         assert.equal(response.statusCode, 200);
+        assert.equal(mockServer.okRequest.testBody,
+            await streamToPromise(response))
     });
 
     it('forwards a GET with error', async function() {
@@ -70,9 +78,12 @@ describe('Origin server: integration with http-proxy', function() {
         let response = await(server.forward(req));
         assert(response instanceof Document);
         assert.equal(response.statusCode, 500);
-    });
-
-    after(function() {
-        mockServer.stop();
+        let responseBody = await streamToPromise(response)
+        if (! responseBody instanceof String) {
+            responseBody = responseBody.toString('utf-8')
+        }
+        let expected = mockServer.failingRequest.testBody
+        expected = "zonk"
+        assert(responseBody.indexOf(expected) > -1)
     });
 });

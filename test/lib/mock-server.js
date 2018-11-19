@@ -7,15 +7,18 @@ module.exports = MockServer;
 function MockServer() {
     app = express();
 
-    function defineRequest(url, servingFn) {
-        app.get(url, servingFn);
-        return function () {
+    function defineRequest(url, testBody, servingFn) {
+        app.get(url, servingFn.bind({testBody}));
+        let retval = function () {
             return mockRequest.get(url);
         }
+        retval.testBody = testBody
+        return retval
     }
 
-    this.okRequest = defineRequest('/OK', (req, res) => res.send('Hello World!'))
-    this.failingRequest = defineRequest('/error', (req, res, next) => next('ERROR'))
+    this.okRequest = defineRequest('/OK', 'Hello World!', function(req, res) { res.send(this.testBody) })
+    this.failingRequest = defineRequest('/error', 'This 500 intentionally left blank',
+        function(req, res, next) { next(this.testBody) })
 
     let started = when.defer();
     let listener;
@@ -25,7 +28,7 @@ function MockServer() {
 
         listener = app.listen(0, (err) => {
             if (err) {
-                started.reject
+                started.reject()
             } else {
                 this.port = listener.address().port;
                 console.log('Listening on port ' + this.port);

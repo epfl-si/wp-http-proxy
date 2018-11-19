@@ -30,6 +30,7 @@
     "express": "^4.16.4",
     "long-stack-traces": "^0.1.2",
     "mocha": "^5.2.0",
-    "stream-spigot": "^3.0.6"
+    "stream-spigot": "^3.0.6",
+    "stream-to-promise": "^2.2.0"
   }
 }
