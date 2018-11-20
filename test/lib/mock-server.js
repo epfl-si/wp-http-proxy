@@ -57,10 +57,10 @@ function MockServer() {
         this.port = {}
 
         const startHttp = startServer.call(this),
-              startHttps = getKeys().then(
-                  (keys) => startServer.call(this,
-                                             {key: keys.serviceKey,
-                                              cert: keys.certificate }))
+              startHttps = this.getPKI().then(
+                  (pki) => startServer.call(this,
+                                             {key: pki.serviceKey,
+                                              cert: pki.certificate }))
 
         return when.join(startHttp, startHttps)
     }
@@ -73,6 +73,12 @@ function MockServer() {
             debug('Closing ' + proto)
             listeners[proto].close()
         }
+    }
+
+    this.getPKI = function() {
+        return memoize('test-pki',
+                       () => nodefn.call(pem.createCertificate,
+                                         { days: 1, selfSigned: true }));
     }
 }
 
@@ -101,15 +107,9 @@ let memoize = (function() {
         } else {
             const retval = await compute()
             const valStr = JSON.stringify(retval)
-            await cache.put(cacheDir, cacheKey, valStr)
+            await cache.put(cacheDir, cacheKey, valStr, {memoize: true})
             debug('Cached value for ' + cacheKey + ': ' + valStr.ellipsis())
             return retval
         }
     }
 })();
-
-async function getKeys () {
-    return memoize('test-pki',
-                   () => nodefn.call(pem.createCertificate,
-                                     { days: 1, selfSigned: true }));
-}

@@ -18,7 +18,16 @@ exports.wordpress = {};
 exports.wordpress.servingPath = '/srv/subdomains';
 exports.wordpress.host = 'jahia2wp-httpd';
 exports.wordpress.port = 8443;
-exports.wordpress.https = true;
+exports.wordpress.ssl = {
+    // Select subset of options that can be passed to Node's
+    // tls.createSecureContext()
+
+    // Note that http-proxy does *not* forward some options, such as
+    // rejectUnauthorized, and therefore neither do we. This kind
+    // of forces you to Do The Right Thing with the CA here (i.e.
+    // ca: null is not going to work).
+    ca: null
+}
 
 exports.deadline = {};
 exports.deadline.cache = 500;

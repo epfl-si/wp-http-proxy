@@ -17,7 +17,7 @@ describe('Origin server: unit tests', function() {
     it('forwards a GET with success', async function() {
         let mp = new MockProxy()
 
-        let server = new OriginServer(mockConfig, mp.request),
+        let server = new OriginServer(mp.request),
             req = mp.getOK
 
         let response = await(server.forward(req));
@@ -28,7 +28,7 @@ describe('Origin server: unit tests', function() {
     it('forwards a GET with error', async function() {
         let mp = new MockProxy();
 
-        let server = new OriginServer(mockConfig, mp.request),
+        let server = new OriginServer(mp.request),
             req = mp.getFailing
 
         let response = await(server.forward(req));
@@ -54,11 +54,7 @@ describe('Origin server: integration with http-proxy', function() {
     });
 
     it('forwards a GET with success', async function() {
-        let config = {
-            host: mockServer.host,
-            port: mockServer.port.http,
-        };
-        let server = new OriginServer(config, proxy.request);
+        let server = new OriginServer(proxy.request);
         
         let req = mockServer.okRequest()
         let response = await(server.forward(req));
@@ -69,11 +65,7 @@ describe('Origin server: integration with http-proxy', function() {
     });
 
     it('forwards a GET with error', async function() {
-        let config = {
-            host: mockServer.host,
-            port: mockServer.port.http,
-        };
-        let server = new OriginServer(config, proxy.request);
+        let server = new OriginServer(proxy.request);
         
         let req = mockServer.failingRequest()
         let response = await(server.forward(req));
@@ -88,14 +80,20 @@ describe('Origin server: integration with http-proxy', function() {
     });
 
     it('requests over HTTP/S when told', async function() {
-        let mp = new MockProxy()
-
-        let server = new OriginServer(mockConfig, mp.request),
-            req = mp.getOK
+        let pki = await mockServer.getPKI()
+        let proxy = buildAProxy({host: 'localhost',
+                                 port: mockServer.port.https,
+                                 ssl: {
+                                    ca: pki.certificate
+                                 }
+                                }),
+            server = new OriginServer(proxy.request),
+            req = mockServer.okRequest()
 
         let response = await(server.forward(req));
-        assert.equal(response.statusCode, 200);
         assert(response instanceof Document);
+        assert.equal(response.statusCode, 200);
+        assert.equal(mockServer.okRequest.testBody,
+            await streamToPromise(response))
     });
-
 });
