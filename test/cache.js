@@ -76,6 +76,7 @@ function newCache(opts) {
                      CachePolicy: CachePolicyWithInjectableClock }
     if (! opts.cache) opts.cache = {}
     if (! opts.deadline) opts.deadline = {}
+    if (! opts.redis) opts.redis = {}
     return new Cache(opts)
 }
 

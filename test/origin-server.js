@@ -43,7 +43,7 @@ describe('Origin server: integration with http-proxy', function() {
     before(async function() {
         mockServer = new MockServer();
         await mockServer.start();
-        proxy = buildAProxy({host: 'localhost', port: mockServer.port});
+        proxy = buildAProxy({host: 'localhost', port: mockServer.port.http});
     });
 
     after(function() {
@@ -55,7 +55,7 @@ describe('Origin server: integration with http-proxy', function() {
     it('forwards a GET with success', async function() {
         let config = {
             host: mockServer.host,
-            port: mockServer.port,
+            port: mockServer.port.http,
         };
         let server = new OriginServer(config, proxy.request);
         
@@ -70,7 +70,7 @@ describe('Origin server: integration with http-proxy', function() {
     it('forwards a GET with error', async function() {
         let config = {
             host: mockServer.host,
-            port: mockServer.port,
+            port: mockServer.port.http,
         };
         let server = new OriginServer(config, proxy.request);
         
@@ -85,4 +85,16 @@ describe('Origin server: integration with http-proxy', function() {
         let expected = mockServer.failingRequest.testBody
         assert(responseBody.indexOf(expected) > -1)
     });
+
+    it('requests over HTTP/S when told', async function() {
+        let mp = new MockProxy()
+
+        let server = new OriginServer(mockConfig, mp.request),
+            req = mp.getOK
+
+        let response = await(server.forward(req));
+        assert.equal(response.statusCode, 200);
+        assert(response instanceof Document);
+    });
+
 });
