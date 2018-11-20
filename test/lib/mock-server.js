@@ -5,7 +5,9 @@ const express = require('express'),
       pem = require('pem'),
       http = require('http'),
       https = require('https'),
-      debug = require('debug')('test/mock-server.js');
+      debug = require('debug')('test/mock-server.js'),
+      findCacheDir = require('find-cache-dir'),
+      cache = require('cacache/en');
 
 module.exports = MockServer;
 
@@ -55,10 +57,10 @@ function MockServer() {
         this.port = {}
 
         const startHttp = startServer.call(this),
-            startHttps = nodefn.call(pem.createCertificate,
-                                     { days: 1, selfSigned: true })
-                .then((keys) => startServer.call(this,
-                    {key: keys.serviceKey, cert: keys.certificate }))
+              startHttps = getKeys().then(
+                  (keys) => startServer.call(this,
+                                             {key: keys.serviceKey,
+                                              cert: keys.certificate }))
 
         return when.join(startHttp, startHttps)
     }
@@ -72,4 +74,42 @@ function MockServer() {
             listeners[proto].close()
         }
     }
+}
+
+String.prototype.ellipsis = function(cutoff) {
+    if (!cutoff) cutoff = 40
+    if (this.length > cutoff) {
+        return this.substring(0, cutoff) + '[...]'
+    } else {
+        return this
+    }
+}
+
+let memoize = (function() {
+    let cacheDir;
+    const defaultTTL = 3600;  // One hour
+
+    return async function(cacheKey, compute, ttl) {
+        if (! ttl) { ttl = defaultTTL }
+        if (! cacheDir) cacheDir = findCacheDir(
+            {name: 'epfl-wordpress-proxy-cache'})
+        let cached = await cache.get.info(cacheDir, cacheKey)
+        if (cached && cached.time + ttl < Date.now()) {
+            let entry = await cache.get(cacheDir, cacheKey)
+            debug('Using cached value for ' + cacheKey + ': ' + entry.data.toString().ellipsis())
+            return JSON.parse(entry.data)
+        } else {
+            const retval = await compute()
+            const valStr = JSON.stringify(retval)
+            await cache.put(cacheDir, cacheKey, valStr)
+            debug('Cached value for ' + cacheKey + ': ' + valStr.ellipsis())
+            return retval
+        }
+    }
+})();
+
+async function getKeys () {
+    return memoize('test-pki',
+                   () => nodefn.call(pem.createCertificate,
+                                     { days: 1, selfSigned: true }));
 }

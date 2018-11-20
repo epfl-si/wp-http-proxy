@@ -25,10 +25,12 @@
     "when": "^3.7.8"
   },
   "devDependencies": {
+    "cacache": "^11.3.1",
     "chai": "^4.2.0",
     "chai-string": "^1.5.0",
     "debug": "^4.1.0",
     "express": "^4.16.4",
+    "find-cache-dir": "^2.0.0",
     "long-stack-traces": "^0.1.2",
     "mocha": "^5.2.0",
     "pem": "^1.13.2",
