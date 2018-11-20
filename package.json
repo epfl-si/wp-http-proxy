@@ -34,7 +34,9 @@
     "long-stack-traces": "^0.1.2",
     "mocha": "^5.2.0",
     "pem": "^1.13.2",
+    "request": "^2.88.0",
     "stream-spigot": "^3.0.6",
-    "stream-to-promise": "^2.2.0"
+    "stream-to-promise": "^2.2.0",
+    "url-parse": "^1.4.4"
   }
 }
