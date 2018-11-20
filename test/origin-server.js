@@ -41,6 +41,7 @@ describe('Origin server: integration with http-proxy', function() {
     let mockServer, proxy;
 
     before(async function() {
+        this.timeout(10000);
         mockServer = new MockServer();
         await mockServer.start();
         proxy = buildAProxy({host: 'localhost', port: mockServer.port.http});
