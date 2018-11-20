@@ -39,22 +39,21 @@ FakeRedis.clear = function() {
    FakeRedis.instance = null
 }
 
+function newCache(opts) {
+    opts = _.cloneDeep(opts || {})
+    opts.inject = { Redis: FakeRedis }
+    if (! opts.cache) opts.cache = {}
+    if (! opts.deadline) opts.deadline = {}
+    return new Cache(opts)
+}
+
+
 describe.only('Cache unit tests', function() {
     let cache
 
-    beforeEach(function () {
-        cache = new Cache({
-            inject: {
-                Redis: FakeRedis
-            },
-            cache: {},
-            deadline: {}
-        })
-    })
+    beforeEach(() => { cache = newCache() })
 
-    afterEach(function () {
-        FakeRedis.clear()
-    })
+    afterEach(() => { FakeRedis.clear() })
 
     it('writes back to the cache', async function () {
         const req = mockRequest.get('/zoinx'),
@@ -77,5 +76,16 @@ describe.only('Cache unit tests', function() {
         let restToo = await cache.writeBack(req, res)
         assert(res === restToo)
         assert.deepEqual(FakeRedis.keys(), [])
+    })
+
+    it('discards documents that are too big', async function () {
+        cache = newCache({cache: {sizeCutoff: 2}})
+        const req = mockRequest.get('/zoinx3'),
+            res = mockResponse(
+                {'Cache-Control': 'public, max-age=300'},
+                'TOOBIGTOCACHE');
+        let restToo = await cache.writeBack(req, res)
+        assert(res === restToo)
+        assert.equal(FakeRedis.keys().length, 0)
     })
 })
