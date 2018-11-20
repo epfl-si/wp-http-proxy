@@ -6,7 +6,9 @@ const EventEmitter = require('events').EventEmitter,
       assert = require('assert'),
       Cache = require('../lib/cache'),
       BSON = require('bson'),
-      streamToPromise = require('stream-to-promise')
+      streamToPromise = require('stream-to-promise'),
+      CachePolicy = require('http-cache-semantics'),
+      debug = require('debug')('test/cache.js')
 
 
 /**
@@ -22,9 +24,9 @@ function FakeRedis(opts) {
         })
     }
 
-    this.getBody = function(k) {
-        let cacheEntry = (new BSON()).deserialize(this.contents[k])
-        return when.resolve(cacheEntry.body.toString())
+    this.get = function(k) {
+        let cacheEntry = this.contents[k]
+        return when.resolve(cacheEntry)
     }
 }
 
@@ -40,19 +42,49 @@ FakeRedis.clear = function() {
    FakeRedis.instance = null
 }
 
+/**
+ * @return The body stored in the cache under key `k`
+ * @param k
+ * @returns {Promise<string>}
+ */
+FakeRedis.getBody = async function(k) {
+    let cacheEntry = BSON.deserialize(await FakeRedis.instance.get(k))
+    return cacheEntry.body.toString()
+}
+
+
+class CachePolicyWithInjectableClock extends CachePolicy {
+
+    now () {
+        let time = Date.now() + CachePolicyWithInjectableClock.timeOffset;
+        console.log(time)
+        return time
+    }
+
+    static reset () {
+        CachePolicyWithInjectableClock.timeOffset = 0
+    }
+
+    static tempusFugit (offset) {
+        CachePolicyWithInjectableClock.timeOffset += offset
+    }
+}
+
 function newCache(opts) {
     opts = _.cloneDeep(opts || {})
-    opts.inject = { Redis: FakeRedis }
+    opts.inject = { Redis: FakeRedis,
+                     CachePolicy: CachePolicyWithInjectableClock }
     if (! opts.cache) opts.cache = {}
     if (! opts.deadline) opts.deadline = {}
     return new Cache(opts)
 }
 
 
-describe('Cache unit tests', function() {
+describe('Cache writeBack unit tests', function() {
     let cache
 
     beforeEach(() => { cache = newCache() })
+    beforeEach(() => { CachePolicyWithInjectableClock.reset() })
 
     afterEach(() => { FakeRedis.clear() })
 
@@ -65,7 +97,7 @@ describe('Cache unit tests', function() {
         assert(res === resToo)
         assert.equal(FakeRedis.keys().length, 1)
         
-        let encached = await FakeRedis.instance.getBody('/zoinx')
+        let encached = await FakeRedis.getBody('/zoinx')
         assert.equal(encached, 'PLZCACHEME')
     });
 
@@ -106,5 +138,65 @@ describe('Cache unit tests', function() {
 
         let responseBody = await responseBodyPromise
         assert.equal(responseBody, 'CACHEDANDSERVED')
+    })
+})
+
+describe('Cache writeBack / read unit tests', function() {
+    let cache
+
+    beforeEach(() => { cache = newCache() })
+    beforeEach(() => { CachePolicyWithInjectableClock.reset() })
+
+    afterEach(() => { FakeRedis.clear() })
+
+    let mock = {}
+
+    mock.request = function(opt_url) {
+        if (! opt_url) {
+            opt_url = mock.request.url
+        }
+        return mockRequest.get(opt_url)
+    }
+    mock.request.url = '/cached'
+
+    mock.response = function(opt_body) {
+        if (! opt_body) {
+            opt_body = mock.response.body
+        }
+        return mockResponse(
+            {'Cache-Control': 'public, max-age=300'},
+            opt_body);
+    }
+    mock.response.body = 'CACHED'
+
+    /**
+     * @return { Promise }
+     */
+    Cache.prototype.encache = function(req, res) {
+        if (! res) { res = mock.response() }
+        if (! req) { req = mock.request() }
+        return this.writeBack(req, res)
+    }
+
+    it('reads', async function() {
+        await cache.encache()
+        let cachedRes = await cache.read(mock.request())
+
+        assert.equal(await streamToPromise(cachedRes), mock.response.body)
+    })
+
+    it('doesn\'t read stale cache entries', async function() {
+        const req = mockRequest.get('/zoinx5'),
+            res = mockResponse(
+                {'Cache-Control': 'public, max-age=300'},
+                'CACHEDANDSERVED');
+
+        let resToo = await cache.writeBack(req, res)
+        assert(res === resToo)
+        assert.equal(FakeRedis.keys().length, 1)
+
+        CachePolicyWithInjectableClock.tempusFugit(500)
+        assert.equal(null, await cache.read(mock.request()))
+        debug('Still ' + FakeRedis.keys().length + ' keys in the cache')
     })
 })

@@ -4,8 +4,8 @@ const expect = require('chai').expect,
 
 // const Response = require('../lib/response');
 
-describe('(new Response()).serve', () => {
-    xit('does backpressure', async function() {
+xdescribe('(new Response()).serve', () => {
+    it('does backpressure', async function() {
 
         const res = new XXX;
 
