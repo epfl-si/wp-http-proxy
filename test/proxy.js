@@ -18,6 +18,7 @@ function inject() {
     inject.Cache = function () {}
 
     inject.Cache.prototype.configSummary = () => {}
+    inject.Cache.prototype.stop = () => {}
 
     return inject
 }
@@ -44,7 +45,7 @@ const [_unused, redisHost, redisPort] = redisAddress.match(/^(.*):(.*)/)
 
 const proxyPort = process.env['EPFL_TEST_PROXY_PORT'] || 0
 
-describe.only('Serving against an actual Redis instance', function() {
+describe('Serving against an actual Redis instance', function() {
     let proxy, mockServer;
     before(async function() {
         this.timeout(10000);
