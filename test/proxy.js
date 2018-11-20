@@ -1,6 +1,6 @@
 'use strict';
 
-const request = require('request'),
+const rp = require('request-promise-any'),
       urlparse = require('url-parse'),
       _ = require('lodash'),
       assert = require('assert'),
@@ -75,14 +75,14 @@ describe.only('Serving against an actual Redis instance', function() {
         debug('all stopped')
     });
 
-    function sendRequest(req) {
+    function request(req) {
         let url = urlparse(req.url),
             hostHeader = url.host
 
         url.set('protocol', 'http')
             .set('host', 'localhost')
             .set('port', proxy.port)
-        return request({
+        return rp({
             url: url.toString(),
             headers: _.extend({
                 host: hostHeader
@@ -96,22 +96,22 @@ describe.only('Serving against an actual Redis instance', function() {
     it('serves and encaches a Cache-Control positive document',
        async function() {
         clearInCache(mockServer.cacheControlPositiveRequest)
-        let res = await sendRequest(mockServer.cacheControlPositiveRequest)
+        let res = await request(mockServer.cacheControlPositiveRequest)
         assert.equal(res.statusCode, 200)
         assert.equal(res.headers['x-epfl-cache'], 'miss')
 
-        res = await sendRequest(mockServer.cacheControlPositiveRequest)
+        res = await request(mockServer.cacheControlPositiveRequest)
         assert.equal(res.statusCode, 200)
         assert.equal(res.headers['x-epfl-cache'], 'hit')
     })
     it('serves and doesn\'t encache a Cache-Control negative document',
       async function() {
         clearInCache(mockServer.cacheControlNegativeRequest)
-        let res = await sendRequest(mockServer.cacheControlNegativeRequest)
+        let res = await request(mockServer.cacheControlNegativeRequest)
         assert.equal(res.statusCode, 200)
         assert.equal(res.headers['x-epfl-cache'], null)
 
-        res = await sendRequest(mockServer.cacheControlNegativeRequest)
+        res = await request(mockServer.cacheControlNegativeRequest)
         assert.equal(res.statusCode, 200)
         assert.equal(res.headers['x-epfl-cache'], null)
       })
