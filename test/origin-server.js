@@ -90,7 +90,8 @@ describe('Origin server: integration with http-proxy', function() {
             server = new OriginServer(proxy.request),
             req = mockServer.okRequest()
 
-        // This is necessary to get the test to succeed; see next test below
+        // This is necessary to get the test to succeed; see the test
+        // two down below
         req.headers.host = 'localhost'
 
         let response = await(server.forward(req));
@@ -101,12 +102,27 @@ describe('Origin server: integration with http-proxy', function() {
     });
 
     it('applies SSL security by default', async function() {
+        let proxy = buildAProxy({host: 'localhost',
+                                 port: mockServer.port.https,
+                                 ssl: true
+                                }),
+            server = new OriginServer(proxy.request),
+            req = mockServer.okRequest()
+
+        req.headers.host = 'example.com'
+        try {
+            await(server.forward(req));
+            assert.fail('Should have failed')
+        } catch (e) {
+            assert.equal('DEPTH_ZERO_SELF_SIGNED_CERT', e.code)
+        }
+    })
+
+    it('detects mismatched hostnames while doing SSL', async function() {
         let pki = await mockServer.getPKI()
         let proxy = buildAProxy({host: 'localhost',
                                  port: mockServer.port.https,
-                                 ssl: {
-                                    ca: pki.certificate
-                                 }
+                                 ssl: { ca: pki.certificate }
                                 }),
             server = new OriginServer(proxy.request),
             req = mockServer.okRequest()
