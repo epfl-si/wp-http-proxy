@@ -5,7 +5,8 @@ const EventEmitter = require('events').EventEmitter,
       _ = require('lodash'),
       assert = require('assert'),
       Cache = require('../lib/cache'),
-      BSON = require('bson')
+      BSON = require('bson'),
+      streamToPromise = require('stream-to-promise')
 
 
 /**
@@ -48,7 +49,7 @@ function newCache(opts) {
 }
 
 
-describe.only('Cache unit tests', function() {
+describe('Cache unit tests', function() {
     let cache
 
     beforeEach(() => { cache = newCache() })
@@ -60,8 +61,8 @@ describe.only('Cache unit tests', function() {
               res = mockResponse(
                   {'Cache-Control': 'public, max-age=300'},
                   'PLZCACHEME');
-        let restToo = await cache.writeBack(req, res)
-        assert(res === restToo)
+        let resToo = await cache.writeBack(req, res)
+        assert(res === resToo)
         assert.equal(FakeRedis.keys().length, 1)
         
         let encached = await FakeRedis.instance.getBody('/zoinx')
@@ -73,8 +74,8 @@ describe.only('Cache unit tests', function() {
               res = mockResponse(
                   {'Cache-Control': 'private'},
                   'PLZDONTCACHEME');
-        let restToo = await cache.writeBack(req, res)
-        assert(res === restToo)
+        let resToo = await cache.writeBack(req, res)
+        assert(res === resToo)
         assert.deepEqual(FakeRedis.keys(), [])
     })
 
@@ -84,8 +85,26 @@ describe.only('Cache unit tests', function() {
             res = mockResponse(
                 {'Cache-Control': 'public, max-age=300'},
                 'TOOBIGTOCACHE');
-        let restToo = await cache.writeBack(req, res)
-        assert(res === restToo)
+        let resToo = await cache.writeBack(req, res)
+        assert(res === resToo)
         assert.equal(FakeRedis.keys().length, 0)
+    })
+
+    it('serves-through after caching', async function () {
+        const req = mockRequest.get('/zoinx4'),
+            res = mockResponse(
+                {'Cache-Control': 'public, max-age=300'},
+                'CACHEDANDSERVED');
+
+        // It is important that all the pipework be done in the same
+        // game turn (before any "await"):
+        let responseBodyPromise = streamToPromise(res)
+
+        let resToo = await cache.writeBack(req, res)
+        assert(res === resToo)
+        assert.equal(FakeRedis.keys().length, 1)
+
+        let responseBody = await responseBodyPromise
+        assert.equal(responseBody, 'CACHEDANDSERVED')
     })
 })

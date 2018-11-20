@@ -83,7 +83,6 @@ describe('Origin server: integration with http-proxy', function() {
             responseBody = responseBody.toString('utf-8')
         }
         let expected = mockServer.failingRequest.testBody
-        expected = "zonk"
         assert(responseBody.indexOf(expected) > -1)
     });
 });
