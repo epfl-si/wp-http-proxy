@@ -13,4 +13,11 @@ try {
     config = undefined;
 }
 
-(new Proxy(config)).serve();
+let proxy = new Proxy(config)
+proxy.serve().then(function(config) {
+    console.log('Listening on port ' + config.proxy.port);
+    console.log('Configuration summary: ', JSON.stringify(config, null, 4))
+}).catch(function(error) {
+    console.log(error);
+    process.exit()
+});
