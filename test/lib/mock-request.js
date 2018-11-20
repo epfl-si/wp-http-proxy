@@ -12,7 +12,7 @@ module.exports.get = function(url) {
         method: 'GET',
         httpVersion: '1.1',
         headers: {
-                host: 'localhost',  // Must be for SSL cert checks to work
+                host: 'example.com',
         },
         url,
         connection: {},

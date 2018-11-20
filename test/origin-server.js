@@ -90,6 +90,47 @@ describe('Origin server: integration with http-proxy', function() {
             server = new OriginServer(proxy.request),
             req = mockServer.okRequest()
 
+        // This is necessary to get the test to succeed; see next test below
+        req.headers.host = 'localhost'
+
+        let response = await(server.forward(req));
+        assert(response instanceof Document);
+        assert.equal(response.statusCode, 200);
+        assert.equal(mockServer.okRequest.testBody,
+            await streamToPromise(response))
+    });
+
+    it('applies SSL security by default', async function() {
+        let pki = await mockServer.getPKI()
+        let proxy = buildAProxy({host: 'localhost',
+                                 port: mockServer.port.https,
+                                 ssl: {
+                                    ca: pki.certificate
+                                 }
+                                }),
+            server = new OriginServer(proxy.request),
+            req = mockServer.okRequest()
+
+        req.headers.host = 'example.com'
+        try {
+            await(server.forward(req));
+            assert.fail('Should have failed')
+        } catch (e) {
+            assert.equal('ERR_TLS_CERT_ALTNAME_INVALID', e.code)
+        }
+    })
+
+    it('requests over HTTP/S insecurely when told', async function() {
+        let pki = await mockServer.getPKI()
+        let proxy = buildAProxy({host: 'localhost',
+                                 port: mockServer.port.https,
+                                 ssl: {
+                                    ca: null
+                                 }
+                                }),
+            server = new OriginServer(proxy.request),
+            req = mockServer.okRequest()
+
         let response = await(server.forward(req));
         assert(response instanceof Document);
         assert.equal(response.statusCode, 200);

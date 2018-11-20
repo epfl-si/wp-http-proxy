@@ -22,11 +22,7 @@ exports.wordpress.ssl = {
     // Select subset of options that can be passed to Node's
     // tls.createSecureContext()
 
-    // Note that http-proxy does *not* forward some options, such as
-    // rejectUnauthorized, and therefore neither do we. This kind
-    // of forces you to Do The Right Thing with the CA here (i.e.
-    // ca: null is not going to work).
-    ca: null
+    rejectUnauthorized: false
 }
 
 exports.deadline = {};
