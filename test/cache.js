@@ -57,7 +57,6 @@ class CachePolicyWithInjectableClock extends CachePolicy {
 
     now () {
         let time = Date.now() + CachePolicyWithInjectableClock.timeOffset;
-        console.log(time)
         return time
     }
 
