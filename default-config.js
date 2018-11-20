@@ -19,6 +19,7 @@ exports.wordpress.servingPath = '/srv/subdomains';
 exports.wordpress.host = 'jahia2wp-httpd';
 exports.wordpress.port = 8443;
 
+exports.deadline = {};
 exports.deadline.cache = 500;
 exports.deadline.hard = 120 * 1000;
 
