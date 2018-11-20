@@ -71,6 +71,7 @@ describe('Serving against an actual Redis instance', function() {
 
     after(function() {
         // Plant a "return" here if you want to test the rig by yourself.
+        return
         if (proxy) proxy.stop();
         if (mockServer) mockServer.stop();
         debug('all stopped')
@@ -82,7 +83,7 @@ describe('Serving against an actual Redis instance', function() {
 
         url.set('protocol', 'http')
             .set('host', 'localhost')
-            .set('port', proxy.port)
+            .set('port', proxy.serve.port)
         return rp({
             url: url.toString(),
             headers: _.extend({
@@ -94,7 +95,7 @@ describe('Serving against an actual Redis instance', function() {
     async function clearInCache(req) {
     }
 
-    it('serves and encaches a Cache-Control positive document',
+    it.only('serves and encaches a Cache-Control positive document',
        async function() {
         clearInCache(mockServer.cacheControlPositiveRequest)
         let res = await request(mockServer.cacheControlPositiveRequest)
@@ -121,6 +122,7 @@ describe('Serving against an actual Redis instance', function() {
     it('forwards a 500 (and doesn\'t encache it)')
     it('serves a binary (non-text) document exactly byte-for-byte')
     it('serves when Redis is down')
+    it('serves a nicely formatted 503 in case of timeout on a cold cache')
 })
 
 return;
