@@ -3,10 +3,15 @@
 const rp = require('request-promise-any'),
       urlparse = require('url-parse'),
       _ = require('lodash'),
-      assert = require('assert'),
+      when = require('when'),
+      chai = require('chai'),
+      streamToPromise = require('stream-to-promise'),
       debug = require('debug')('test/proxy.js'),
       MockServer = require('./lib/mock-server.js'),
       Proxy = require('../lib/proxy.js');
+
+chai.use(require('chai-string'))
+const assert = chai.assert
 
 function inject() {
     let inject = {}
@@ -47,11 +52,35 @@ const proxyPort = process.env['EPFL_TEST_PROXY_PORT'] || 0
 
 describe('Serving against an actual Redis instance', function() {
     let proxy, mockServer;
-    before(async function() {
-        this.timeout(10000);
-        mockServer = new MockServer();
-        await mockServer.start();
-        proxy = new Proxy({
+
+    async function setMockServer (aMockServer) {
+        if (mockServer) {
+            await mockServer.stop();
+            mockServer = null;
+        }
+        mockServer = aMockServer;
+        if (mockServer) {
+            await mockServer.start();
+        }
+    }
+
+    async function setProxy (aProxy) {
+        if (proxy) {
+            proxy.stop();
+            proxy = null;
+        }
+        if (! aProxy) return
+        if (! aProxy instanceof Proxy) {
+            proxy = aProxy
+        } else {
+            proxy = new Proxy(aProxy)
+        }
+        await proxy.serve()
+        debug('Proxy is listening on port ' + proxy.serve.port)
+    }
+
+    function proxyConfig () {
+        return {
             cache: {
                 port: proxyPort
             },
@@ -64,17 +93,24 @@ describe('Serving against an actual Redis instance', function() {
                 host: redisHost,
                 port: redisPort
             }
-        });
-        await proxy.serve()
-        debug('Proxy is listening on port ' + proxy.serve.port)
+        }
+    }
+
+    before(async () => {
+        this.timeout(10000);  // In case we need to regenerate certificates
+        await setMockServer(new MockServer())
     });
 
-    after(function() {
-        // Plant a "return" here if you want to test the rig by yourself.
-        return
-        if (proxy) proxy.stop();
-        if (mockServer) mockServer.stop();
-        debug('all stopped')
+    beforeEach(async () => {
+        setProxy(proxyConfig())
+    })
+
+    after(async function() {
+        // Plant a "return" here (or comment out the entire call to
+        // after()) if you want to test the rig manually.
+        await when.all([
+            setMockServer(null),
+            setProxy(null)])
     });
 
     function request(req) {
@@ -95,20 +131,30 @@ describe('Serving against an actual Redis instance', function() {
     async function clearInCache(req) {
     }
 
-    it.only('serves and encaches a Cache-Control positive document',
+    beforeEach(async function() {
+        await when.all([
+            mockServer.cacheControlPositiveRequest,
+            mockServer.cacheControlNegativeRequest,
+        ].map(clearInCache))
+    })
+
+    it('serves and encaches a Cache-Control positive document',
        async function() {
-        clearInCache(mockServer.cacheControlPositiveRequest)
         let res = await request(mockServer.cacheControlPositiveRequest)
         assert.equal(res.statusCode, 200)
         assert.equal(res.headers['x-epfl-cache'], 'miss')
 
+        let expectedBody = mockServer.cacheControlPositiveRequest.testBody
+        assert.equal(expectedBody, await streamToPromise(res))
+
         res = await request(mockServer.cacheControlPositiveRequest)
         assert.equal(res.statusCode, 200)
         assert.equal(res.headers['x-epfl-cache'], 'hit')
+        assert.equal(expectedBody, await streamToPromise(res))
     })
+
     it('serves and doesn\'t encache a Cache-Control negative document',
       async function() {
-        clearInCache(mockServer.cacheControlNegativeRequest)
         let res = await request(mockServer.cacheControlNegativeRequest)
         assert.equal(res.statusCode, 200)
         assert.equal(res.headers['x-epfl-cache'], null)
@@ -118,14 +164,20 @@ describe('Serving against an actual Redis instance', function() {
         assert.equal(res.headers['x-epfl-cache'], null)
       })
 
-    it('forwards a 302 (and doesn\'t encache it)')
-    it('forwards a 500 (and doesn\'t encache it)')
+    it('forwards 302\'s, 404\'s and 500\'s')
     it('serves a binary (non-text) document exactly byte-for-byte')
     it('serves when Redis is down')
-    it('serves a nicely formatted 503 in case of timeout on a cold cache')
+    it('serves a nicely formatted 503 in case of timeout on a cold cache',
+       async function() {
+        await setProxy(_.extend(proxyConfig(), {deadline: {hard: 0}}))
+        let res = await request(mockServer.cacheControlPositiveRequest)
+        assert.equal(res.statusCode, 503)
+        let formattedError = await streamToPromise(res)
+        assert.containIgnoreCase(formattedError, 'timeout')
+    })
 })
 
-return;
+return;  // Moar later
 
 describe('Serving logged-in users', function() {
     it('bypasses the cache for any request that has a Wordpress cookie')
