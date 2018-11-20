@@ -1,5 +1,7 @@
 'use strict';
 
+require('any-promise/register/when')
+
 const rp = require('request-promise-any'),
       urlparse = require('url-parse'),
       _ = require('lodash'),

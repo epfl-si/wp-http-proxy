@@ -1,3 +1,5 @@
+require('any-promise/register/when')
+
 const EventEmitter = require('events').EventEmitter,
       mockRequest = require('./lib/mock-request.js'),
       mockResponse = require('./lib/mock-response.js'),
