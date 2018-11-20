@@ -48,7 +48,7 @@ describe('Origin server: integration with http-proxy', function() {
     });
 
     after(function() {
-        // Comment out the next line if you want to make send a few
+        // Comment out the next line if you want to send a few
         // queries of your own to the mockServer:
         mockServer.stop();
     });

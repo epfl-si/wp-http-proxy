@@ -26,6 +26,23 @@ function MockServer() {
     this.okRequest = defineRequest('/OK', 'Hello World!', function(req, res) { res.send(this.testBody) })
     this.failingRequest = defineRequest('/error', 'This 500 intentionally left blank',
         function(req, res, next) { next(this.testBody) })
+    this.cacheControlPositiveRequest = defineRequest(
+        '/cached', 'Hello Cached World!', 
+        function(req, res) { 
+            res.set({
+                'Cache-Control': 'public, max-age=300'
+            })
+            res.send(this.testBody)
+        })
+
+    this.cacheControlNegativeRequest = defineRequest(
+        '/uncacheable', 'Hello Uncached World!', 
+        function(req, res) { 
+            res.set({
+                'Cache-Control': 'private'
+            })
+            res.send(this.testBody)
+        })
 
     let listeners = {}
 
