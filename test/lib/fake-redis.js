@@ -25,6 +25,8 @@ function FakeRedis(opts) {
         let cacheEntry = this.contents[k]
         return when.resolve(cacheEntry)
     }
+
+    this.disconnect = () => {}
 }
 
 FakeRedis.keys = function() {
