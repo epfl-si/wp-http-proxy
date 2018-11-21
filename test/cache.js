@@ -32,12 +32,12 @@ class CachePolicyWithInjectableClock extends CachePolicy {
 
 function newCache(opts) {
     opts = _.cloneDeep(opts || {})
-    opts.inject = { Redis: FakeRedis,
+    let inject = { Redis: FakeRedis,
                      CachePolicy: CachePolicyWithInjectableClock }
     if (! opts.cache) opts.cache = {}
     if (! opts.deadline) opts.deadline = {}
     if (! opts.redis) opts.redis = {}
-    return new Cache(opts)
+    return new Cache(opts, inject)
 }
 
 

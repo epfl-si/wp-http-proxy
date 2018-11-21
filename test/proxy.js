@@ -54,7 +54,7 @@ describe(TestRig().integration().banner, function() {
         if (aProxy instanceof Proxy) {
             proxy = aProxy
         } else {
-            proxy = new Proxy(rig.proxyConfig(aProxy))
+            proxy = new Proxy(rig.proxyConfig(aProxy), rig.inject())
         }
         await proxy.serve()
         debug('Proxy is listening on port ' + proxy.serve.port)
