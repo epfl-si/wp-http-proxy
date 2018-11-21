@@ -123,6 +123,8 @@ describe('Serving against an actual Redis instance', function() {
             .set('host', 'localhost')
             .set('port', proxy.serve.port)
         return rp({
+            simple: false,   // Get 500's like 200's (instead of throwing them)
+            resolveWithFullResponse: true,
             url: url.toString(),
             headers: _.extend({
                 host: hostHeader
