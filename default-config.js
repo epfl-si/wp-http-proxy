@@ -49,7 +49,7 @@ exports.serve = async function(req, world) {
         return this.serve.loggedIn(req, res, world);
     }
 
-    let cached = cache.read(req, {deadline: this.deadline.cache });
+    let cached = await cache.read(req, {deadline: this.deadline.cache });
     if (cached instanceof this.when.TimeoutError) {
         return originServer.forward(req);
     } else if (cached) {
