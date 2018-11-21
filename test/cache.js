@@ -3,57 +3,16 @@ require('any-promise/register/when')
 const EventEmitter = require('events').EventEmitter,
       mockRequest = require('./lib/mock-request.js'),
       mockResponse = require('./lib/mock-response.js'),
+      FakeRedis = require('./lib/fake-redis.js'),
       when = require('when'),
       _ = require('lodash'),
-      assert = require('assert'),
+      chai = require('chai'),
+      assert = chai.assert,
       Cache = require('../lib/cache'),
       BSON = require('bson'),
       streamToPromise = require('stream-to-promise'),
       CachePolicy = require('http-cache-semantics'),
       debug = require('debug')('test/cache.js')
-
-
-/**
- * @constructor
- */
-function FakeRedis(opts) {
-    FakeRedis.instance = this
-    this.contents = {}
-
-    this.set = function(k, v) {
-        return when.resolve().then(() => {
-            this.contents[k] = v
-        })
-    }
-
-    this.get = function(k) {
-        let cacheEntry = this.contents[k]
-        return when.resolve(cacheEntry)
-    }
-}
-
-FakeRedis.keys = function() {
-    return _.keys(FakeRedis.instance.contents)
-}
-
-FakeRedis.contents = function() {
-    return FakeRedis.instance.contents
-}
-
-FakeRedis.clear = function() {
-   FakeRedis.instance = null
-}
-
-/**
- * @return The body stored in the cache under key `k`
- * @param k
- * @returns {Promise<string>}
- */
-FakeRedis.getBody = async function(k) {
-    let cacheEntry = BSON.deserialize(await FakeRedis.instance.get(k))
-    return cacheEntry.body.toString()
-}
-
 
 class CachePolicyWithInjectableClock extends CachePolicy {
 

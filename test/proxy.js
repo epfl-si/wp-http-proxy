@@ -5,65 +5,44 @@ require('any-promise/register/when')
 const rp = require('request-promise-any'),
       urlparse = require('url-parse'),
       _ = require('lodash'),
+      extend = require('deep-extend'),
       when = require('when'),
       chai = require('chai'),
       streamToPromise = require('stream-to-promise'),
       debug = require('debug')('test/proxy.js'),
       MockServer = require('./lib/mock-server.js'),
+      FakeRedis = require('./lib/fake-redis.js'),
       Proxy = require('../lib/proxy.js');
 
 chai.use(require('chai-string'))
 const assert = chai.assert
 
-function inject() {
-    let inject = {}
-
-    inject.Wordpress = function () {}
-
-    inject.OriginServer = function () {}
-
-    inject.Cache = function () {}
-
-    inject.Cache.prototype.configSummary = () => {}
-    inject.Cache.prototype.stop = () => {}
-
-    return inject
-}
-
-
 describe('Top-level Proxy class', function() {
-    let proxy
+    let rig = TestRig().isolated(),
+        proxy
 
     afterEach(() => {
         if (proxy) proxy.stop()
     })
 
     it('constructs', async function() {
-        proxy = new Proxy(null, inject())
+        proxy = new Proxy(rig.proxyConfig(), rig.inject())
         await proxy.serve()
     })
 })
 
-const redisAddress = process.env['EPFL_TEST_REDIS_ADDRESS']
-
-if (! redisAddress) return
-
-const [_unused, redisHost, redisPort] = redisAddress.match(/^(.*):(.*)/)
-
-const proxyPort = process.env['EPFL_TEST_PROXY_PORT'] || 0
-
-describe('Serving against an actual Redis instance', function() {
-    let proxy, mockServer;
+describe(TestRig().integration().banner, function() {
+    let rig = TestRig().integration(),
+        proxy, mockServer
 
     async function setMockServer (aMockServer) {
         if (mockServer) {
             await mockServer.stop();
             mockServer = null;
         }
-        mockServer = aMockServer;
-        if (mockServer) {
-            await mockServer.start();
-        }
+        rig.wordpress = mockServer = aMockServer
+        if (! mockServer) return
+        await mockServer.start()
     }
 
     async function setProxy (aProxy) {
@@ -72,30 +51,13 @@ describe('Serving against an actual Redis instance', function() {
             proxy = null;
         }
         if (! aProxy) return
-        if (! aProxy instanceof Proxy) {
+        if (aProxy instanceof Proxy) {
             proxy = aProxy
         } else {
-            proxy = new Proxy(aProxy)
+            proxy = new Proxy(rig.proxyConfig(aProxy))
         }
         await proxy.serve()
         debug('Proxy is listening on port ' + proxy.serve.port)
-    }
-
-    function proxyConfig () {
-        return {
-            cache: {
-                port: proxyPort
-            },
-            wordpress: {
-                host: 'localhost',
-                port: mockServer.port.https,
-                ssl: { ca: null },
-            },
-            redis: {
-                host: redisHost,
-                port: redisPort
-            }
-        }
     }
 
     before(async () => {
@@ -104,7 +66,7 @@ describe('Serving against an actual Redis instance', function() {
     });
 
     beforeEach(async () => {
-        setProxy(proxyConfig())
+        setProxy(rig.proxyConfig())
     })
 
     after(async function() {
@@ -173,7 +135,7 @@ describe('Serving against an actual Redis instance', function() {
     it('serves when Redis is down')
     it('serves a nicely formatted 503 in case of timeout on a cold cache',
        async function() {
-        await setProxy(_.extend(proxyConfig(), {deadline: {hard: 0}}))
+        await setProxy({deadline: {hard: 0}})
         let res = await request(mockServer.cacheControlPositiveRequest)
         assert.equal(res.statusCode, 503)
         let formattedError = await streamToPromise(res)
@@ -193,3 +155,80 @@ describe('Prometheus', function() {
     it('has Prometheus stats for number of entries in the cache')
     it('has Prometheus stats for rate of cache misses / hits')
 })
+
+/**
+ * @constructor (but also works like a function)
+ */
+function TestRig () {
+    if (this instanceof TestRig) { // Called as a constructor
+        return
+    }
+
+    return {
+        isolated () {
+            let that = new TestRig()
+            that.proxyConfig = () => null
+
+            function MockCache() {}
+            MockCache.prototype.configSummary = () => {}
+            MockCache.prototype.stop = () => {}
+
+            that.inject = () => ({
+                Wordpress: function() {},
+                OriginServer: function() {},
+                Cache: MockCache
+            })
+
+            return that
+        },
+
+        /**
+         * @return A TestRig talking to as many real components as possible.
+         *
+         * This NPM package doesn't embed a Redis mock. If
+         * EPFL_TEST_REDIS_ADDRESS is defined in the environment, we will be
+         * using it; otherwise we make do with a @link FakeRedis.
+         */
+        integration () {
+            const proxyPort = process.env['EPFL_TEST_PROXY_PORT'] || 0
+
+            const redisAddress = process.env['EPFL_TEST_REDIS_ADDRESS']
+
+            let that = new TestRig()
+
+            that.banner = redisAddress ?
+                'Serving against an actual Redis instance':
+                'Proxy integration tests with mock Redis'
+
+            let firstTimeLogged = false
+
+            that.proxyConfig = function(opt_config) {
+                let baseConfig = {
+                    cache: {
+                        port: proxyPort
+                    },
+                    wordpress: {
+                        host: 'localhost',
+                        // SSL configuration like in EPFL prod:
+                        port: that.wordpress.port.https,
+                        ssl: { ca: null },
+                    }
+                }
+                if (redisAddress) {
+                    const [_unused, host, port] = redisAddress.match(/^(.*):(.*)$/)
+                    baseConfig.redis = { host, port }
+                }
+                let config = extend(baseConfig, opt_config || {})
+                if (! firstTimeLogged) {
+                    debug('Proxy config is ' + JSON.stringify(config))
+                    firstTimeLogged = true
+                }
+                return config
+            }
+
+            that.inject = () => (redisAddress ? {} : { Redis: FakeRedis })
+
+            return that
+        }
+    }
+}
